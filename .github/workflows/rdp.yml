@@ -1,0 +1,42 @@
+name: Windows RDP via Tailscale
+
+on:
+  workflow_dispatch: # يتيح لك تشغيل الخادم يدوياً بضغطة زر
+
+jobs:
+  build:
+    runs-on: windows-latest # تشغيل أحدث نسخة ويندوز متوفرة
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Connect to Tailscale
+      uses: tailscale/github-action@v2
+      with:
+        authkey: ${{ secrets.TS_AUTH_KEY }} # الرمز السري الذي حفظته في إعدادات جيت هاب
+
+    - name: Enable Remote Desktop
+      run: |
+        # تفعيل خاصية RDP في نظام الويندوز الخاص بجيت هاب
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        
+        # إنشاء مستخدم جديد مخصص للاتصال
+        $Password = ConvertTo-SecureString "GitHubRDP2026!" -AsPlainText -Force
+        New-LocalUser "RunnerAdmin" -Password $Password -Description "RDP User"
+        Add-LocalGroupMember -Group "Administrators" -Member "RunnerAdmin"
+        Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RunnerAdmin"
+
+    - name: Keep Alive and Show Connection Info
+      run: |
+        # عرض اسم الجهاز والآي بي الخاص بك على شبكة تيلسكيل
+        Write-Host "=========================================================="
+        Write-Host "Device Name on Tailscale: " $env:COMPUTERNAME
+        Write-Host "Username: RunnerAdmin"
+        Write-Host "Password: GitHubRDP2026!"
+        Write-Host "=========================================================="
+        Write-Host "The server will stay active. Do not cancel this step."
+        
+        # إبقاء الخادم يعمل لمدة 5 ساعات ونصف (قبل الحد الأقصى لجيت هاب)
+        Start-Sleep -Seconds 19800
